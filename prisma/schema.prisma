@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  rating    Int      @default(1000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tournaments TournamentParticipant[]
+  matchesAsPlayer1 Match[] @relation("Player1Matches")
+  matchesAsPlayer2 Match[] @relation("Player2Matches")
+  matchResults MatchResult[]
+  matchWinner Match[] @relation("MatchWinner")
+
+  @@index([rating])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Tournament {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      TournamentStatus @default(UPCOMING)
+  maxPlayers  Int
+  currentPlayers Int @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  participants TournamentParticipant[]
+  matches      Match[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("tournaments")
+}
+
+model TournamentParticipant {
+  id           String @id @default(cuid())
+  userId       String
+  tournamentId String
+  position     Int?
+  points       Int    @default(0)
+  joinedAt     DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tournamentId])
+  @@index([tournamentId])
+  @@index([points])
+  @@map("tournament_participants")
+}
+
+model Match {
+  id           String      @id @default(cuid())
+  tournamentId String
+  player1Id    String
+  player2Id    String
+  status       MatchStatus @default(PENDING)
+  winnerId     String?
+  round        Int
+  matchNumber  Int
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player1    User       @relation("Player1Matches", fields: [player1Id], references: [id])
+  player2    User       @relation("Player2Matches", fields: [player2Id], references: [id])
+  winner     User?      @relation("MatchWinner", fields: [winnerId], references: [id])
+  results    MatchResult[]
+
+  @@index([tournamentId])
+  @@index([status])
+  @@index([round])
+  @@map("matches")
+}
+
+model MatchResult {
+  id        String @id @default(cuid())
+  matchId   String
+  playerId  String
+  points    Int
+  createdAt DateTime @default(now())
+
+  match  Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player User  @relation(fields: [playerId], references: [id])
+
+  @@map("match_results")
+}
+
+enum TournamentStatus {
+  UPCOMING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MatchStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
